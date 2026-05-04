@@ -12,14 +12,18 @@ type healthResponse struct {
 }
 
 type stateResponse struct {
-	MotorConnected   bool   `json:"motor_connected"`
-	CameraConnected  bool   `json:"camera_connected"`
-	Left             int    `json:"left"`
-	Right            int    `json:"right"`
-	Failsafe         bool   `json:"failsafe"`
-	LastCommandValid bool   `json:"last_command_valid"`
-	LastError        string `json:"last_error"`
-	LastCommandAt    string `json:"last_command_at,omitempty"`
+	MotorConnected   bool    `json:"motor_connected"`
+	CameraConnected  bool    `json:"camera_connected"`
+	Left             int     `json:"left"`
+	Right            int     `json:"right"`
+	Failsafe         bool    `json:"failsafe"`
+	LastCommandValid bool    `json:"last_command_valid"`
+	LastError        string  `json:"last_error"`
+	LastCommandAt    string  `json:"last_command_at,omitempty"`
+
+	BatteryVoltage float64 `json:"battery_voltage"`
+	RSSI           int     `json:"rssi"`
+	LastTelemetryAt string  `json:"last_telemetry_at,omitempty"`
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -42,10 +46,16 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		Failsafe:         state.Failsafe,
 		LastCommandValid: state.LastCommandValid,
 		LastError:        state.LastError,
+		BatteryVoltage:   state.BatteryVoltage,
+		RSSI:             state.RSSI,
 	}
 
 	if !state.LastCommandAt.IsZero() {
 		resp.LastCommandAt = state.LastCommandAt.Format(time.RFC3339)
+	}
+
+	if !state.LastTelemetryAt.IsZero() {
+		resp.LastTelemetryAt = state.LastTelemetryAt.Format(time.RFC3339)
 	}
 
 	writeJSON(w, http.StatusOK, resp, s.logger)

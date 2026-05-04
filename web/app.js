@@ -12,6 +12,8 @@ const motorStatus = document.getElementById("motor-status");
 const cameraStatus = document.getElementById("camera-status");
 const failsafeStatus = document.getElementById("failsafe-status");
 const commandStatus = document.getElementById("command-status");
+const batteryVoltage = document.getElementById("battery-voltage");
+const rssiValue = document.getElementById("rssi-value");
 
 function connectWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -136,6 +138,9 @@ function renderState(state) {
     motorStatus.textContent = state.motor_connected ? "подключен" : "нет связи";
     cameraStatus.textContent = state.camera_connected ? "подключена" : "нет связи";
     failsafeStatus.textContent = state.failsafe ? "true" : "false";
+
+    batteryVoltage.textContent = `${Number(state.battery_voltage || 0).toFixed(2)} В`;
+    rssiValue.textContent = `${state.rssi || 0} dBm`;
 
     if (state.last_command_valid) {
         commandStatus.textContent = "ok";

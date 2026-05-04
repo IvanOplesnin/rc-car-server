@@ -11,4 +11,8 @@ type State struct {
 	LastCommandValid bool
 	LastError        string
 	LastCommandAt    time.Time
+
+	BatteryVoltage float64
+	RSSI           int
+	LastTelemetryAt time.Time
 }

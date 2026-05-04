@@ -8,11 +8,12 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	Web    WebConfig    `yaml:"web"`
-	Motor  MotorConfig  `yaml:"motor"`
-	Camera CameraConfig `yaml:"camera"`
-	Safety SafetyConfig `yaml:"safety"`
+	Server    ServerConfig    `yaml:"server"`
+	Web       WebConfig       `yaml:"web"`
+	Motor     MotorConfig     `yaml:"motor"`
+	Telemetry TelemetryConfig `yaml:"telemetry"`
+	Camera    CameraConfig    `yaml:"camera"`
+	Safety    SafetyConfig    `yaml:"safety"`
 }
 
 type ServerConfig struct {
@@ -26,6 +27,11 @@ type WebConfig struct {
 
 type MotorConfig struct {
 	Address string `yaml:"address"`
+}
+
+type TelemetryConfig struct {
+	ListenAddress  string `yaml:"listen_address"`
+	MotorTimeoutMS int    `yaml:"motor_timeout_ms"`
 }
 
 type CameraConfig struct {
@@ -70,16 +76,32 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("web.static_dir is required")
 	}
 
-	if c.Safety.CommandTimeoutMS <= 0 {
-		return fmt.Errorf("safety.command_timeout_ms must be positive")
+	if c.Motor.Address == "" {
+		return fmt.Errorf("motor.address is required")
+	}
+
+	if c.Telemetry.ListenAddress == "" {
+		return fmt.Errorf("telemetry.listen_address is required")
+	}
+
+	if c.Telemetry.MotorTimeoutMS <= 0 {
+		return fmt.Errorf("telemetry.motor_timeout_ms must be positive")
+	}
+
+	if c.Camera.StreamURL == "" {
+		return fmt.Errorf("camera.stream_url is required")
 	}
 
 	if c.Camera.CheckIntervalMS <= 0 {
 		return fmt.Errorf("camera.check_interval_ms must be positive")
 	}
-	
+
 	if c.Camera.CheckTimeoutMS <= 0 {
 		return fmt.Errorf("camera.check_timeout_ms must be positive")
+	}
+
+	if c.Safety.CommandTimeoutMS <= 0 {
+		return fmt.Errorf("safety.command_timeout_ms must be positive")
 	}
 
 	return nil

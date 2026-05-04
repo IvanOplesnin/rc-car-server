@@ -15,19 +15,21 @@ import (
 	"github.com/IvanOplesnin/rc-car-server.git/internal/httpserver"
 	"github.com/IvanOplesnin/rc-car-server.git/internal/motor"
 	"github.com/IvanOplesnin/rc-car-server.git/internal/safety"
+	"github.com/IvanOplesnin/rc-car-server.git/internal/telemetry"
 	"github.com/IvanOplesnin/rc-car-server.git/internal/ws"
 )
 
 type App struct {
-	cfg            *config.Config
-	logger         *slog.Logger
-	httpServer     *httpserver.Server
-	controlService *control.Service
-	motorClient    *motor.Client
-	cameraProxy    *camera.Proxy
-	cameraMonitor  *camera.Monitor
-	wsHandler      *ws.Handler
-	watchdog       *safety.Watchdog
+	cfg               *config.Config
+	logger            *slog.Logger
+	httpServer        *httpserver.Server
+	controlService    *control.Service
+	motorClient       *motor.Client
+	cameraProxy       *camera.Proxy
+	cameraMonitor     *camera.Monitor
+	telemetryListener *telemetry.Listener
+	wsHandler         *ws.Handler
+	watchdog          *safety.Watchdog
 }
 
 func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
@@ -49,6 +51,13 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		time.Duration(cfg.Camera.CheckTimeoutMS)*time.Millisecond,
 	)
 
+	telemetryListener := telemetry.NewListener(
+		logger,
+		cfg.Telemetry.ListenAddress,
+		time.Duration(cfg.Telemetry.MotorTimeoutMS)*time.Millisecond,
+		controlService,
+	)
+
 	httpServer := httpserver.New(
 		cfg,
 		logger,
@@ -61,15 +70,16 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	watchdog := safety.NewWatchdog(logger, controlService, watchdogTimeout)
 
 	return &App{
-		cfg:            cfg,
-		logger:         logger,
-		httpServer:     httpServer,
-		controlService: controlService,
-		motorClient:    motorClient,
-		cameraProxy:    cameraProxy,
-		cameraMonitor:  cameraMonitor,
-		wsHandler:      wsHandler,
-		watchdog:       watchdog,
+		cfg:               cfg,
+		logger:            logger,
+		httpServer:        httpServer,
+		controlService:    controlService,
+		motorClient:       motorClient,
+		cameraProxy:       cameraProxy,
+		cameraMonitor:     cameraMonitor,
+		telemetryListener: telemetryListener,
+		wsHandler:         wsHandler,
+		watchdog:          watchdog,
 	}, nil
 }
 
@@ -77,10 +87,16 @@ func (a *App) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
 
 	go a.watchdog.Run(ctx)
 	go a.cameraMonitor.Run(ctx)
+
+	go func() {
+		if err := a.telemetryListener.Run(ctx); err != nil {
+			errCh <- fmt.Errorf("telemetry listener: %w", err)
+		}
+	}()
 
 	go func() {
 		errCh <- a.httpServer.Run()
@@ -92,7 +108,7 @@ func (a *App) Run() error {
 	select {
 	case err := <-errCh:
 		cancel()
-		return fmt.Errorf("http server error: %w", err)
+		return fmt.Errorf("app error: %w", err)
 
 	case sig := <-stopCh:
 		a.logger.Info("received shutdown signal", "signal", sig.String())

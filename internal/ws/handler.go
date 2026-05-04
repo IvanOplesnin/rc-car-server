@@ -104,6 +104,8 @@ func (h *Handler) sendState(conn *websocket.Conn, state control.State) {
 		Failsafe:         state.Failsafe,
 		LastCommandValid: state.LastCommandValid,
 		Error:            state.LastError,
+		BatteryVoltage:   state.BatteryVoltage,
+		RSSI:             state.RSSI,
 	}
 
 	if err := conn.WriteJSON(msg); err != nil {

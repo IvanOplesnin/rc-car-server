@@ -106,6 +106,37 @@ func (s *Service) SetCameraConnected(connected bool) State {
 	return s.state
 }
 
+func (s *Service) UpdateMotorTelemetry(t MotorTelemetry) State {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.state.MotorConnected {
+		s.logger.Info("motor connection state changed", "connected", true)
+	}
+
+	s.state.MotorConnected = true
+	s.state.BatteryVoltage = t.BatteryVoltage
+	s.state.RSSI = t.RSSI
+	s.state.Left = t.Left
+	s.state.Right = t.Right
+	s.state.Failsafe = t.Failsafe
+	s.state.LastTelemetryAt = time.Now()
+
+	return s.state
+}
+
+func (s *Service) SetMotorConnected(connected bool) State {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.state.MotorConnected != connected {
+		s.logger.Info("motor connection state changed", "connected", connected)
+	}
+
+	s.state.MotorConnected = connected
+
+	return s.state
+}
 
 func (s *Service) setInvalidCommand(err error) State {
 	s.mu.Lock()
