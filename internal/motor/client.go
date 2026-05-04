@@ -35,15 +35,47 @@ func NewClient(address string, logger *slog.Logger) (*Client, error) {
 }
 
 func (c *Client) Send(left, right int) error {
-	cmd := Command{
-		Seq:   c.seq.Add(1),
-		Left:  left,
-		Right: right,
+	msg := Message{
+		Version:   ProtocolVersion,
+		Type:      MessageTypeControl,
+		Seq:       c.nextSeq(),
+		Timestamp: nowUnixMilli(),
+		Payload: Payload{
+			Drive: &DrivePayload{
+				Left:  left,
+				Right: right,
+			},
+		},
 	}
 
-	data, err := json.Marshal(cmd)
+	return c.sendMessage(msg)
+}
+
+func (c *Client) Stop() error {
+	return c.Send(0, 0)
+}
+
+func (c *Client) EmergencyStop(reason string) error {
+	msg := Message{
+		Version:   ProtocolVersion,
+		Type:      MessageTypeSystem,
+		Seq:       c.nextSeq(),
+		Timestamp: nowUnixMilli(),
+		Payload: Payload{
+			System: &SystemPayload{
+				Command: SystemCommandEmergencyStop,
+				Reason:  reason,
+			},
+		},
+	}
+
+	return c.sendMessage(msg)
+}
+
+func (c *Client) sendMessage(msg Message) error {
+	data, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("marshal motor command: %w", err)
+		return fmt.Errorf("marshal motor message: %w", err)
 	}
 
 	if err := c.conn.SetWriteDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
@@ -51,22 +83,18 @@ func (c *Client) Send(left, right int) error {
 	}
 
 	if _, err := c.conn.Write(data); err != nil {
-		return fmt.Errorf("write udp motor command: %w", err)
+		return fmt.Errorf("write udp motor message: %w", err)
 	}
 
 	c.logger.Info(
-		"motor command sent",
+		"motor message sent",
 		"address", c.addr.String(),
-		"seq", cmd.Seq,
-		"left", cmd.Left,
-		"right", cmd.Right,
+		"type", msg.Type,
+		"seq", msg.Seq,
+		"payload", string(data),
 	)
 
 	return nil
-}
-
-func (c *Client) Stop() error {
-	return c.Send(0, 0)
 }
 
 func (c *Client) Close() error {
@@ -79,4 +107,12 @@ func (c *Client) Close() error {
 	}
 
 	return nil
+}
+
+func (c *Client) nextSeq() uint64 {
+	return c.seq.Add(1)
+}
+
+func nowUnixMilli() int64 {
+	return time.Now().UnixMilli()
 }

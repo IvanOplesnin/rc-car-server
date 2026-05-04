@@ -11,13 +11,44 @@ import (
 	"github.com/IvanOplesnin/rc-car-server.git/internal/control"
 )
 
-type MotorTelemetryMessage struct {
-	Type           string  `json:"type"`
+const (
+	ProtocolVersion      = 1
+	MessageTypeTelemetry = "telemetry"
+)
+
+type Message struct {
+	Version   int     `json:"version"`
+	Type      string  `json:"type"`
+	Seq       uint64  `json:"seq"`
+	Timestamp int64   `json:"timestamp"`
+	Payload   Payload `json:"payload"`
+}
+
+type Payload struct {
+	Motor   *MotorPayload   `json:"motor,omitempty"`
+	Power   *PowerPayload   `json:"power,omitempty"`
+	Network *NetworkPayload `json:"network,omitempty"`
+	System  *SystemPayload  `json:"system,omitempty"`
+}
+
+type MotorPayload struct {
+	Left     int  `json:"left"`
+	Right    int  `json:"right"`
+	Failsafe bool `json:"failsafe"`
+}
+
+type PowerPayload struct {
 	BatteryVoltage float64 `json:"battery_voltage"`
-	RSSI           int     `json:"rssi"`
-	Left           int     `json:"left"`
-	Right          int     `json:"right"`
-	Failsafe       bool    `json:"failsafe"`
+	BatteryPercent int     `json:"battery_percent"`
+}
+
+type NetworkPayload struct {
+	RSSI int `json:"rssi"`
+}
+
+type SystemPayload struct {
+	UptimeMS uint64 `json:"uptime_ms"`
+	FreeHeap uint64 `json:"free_heap"`
 }
 
 type StateUpdater interface {
@@ -80,7 +111,7 @@ func (l *Listener) Run(ctx context.Context) error {
 }
 
 func (l *Listener) readLoop(ctx context.Context, conn *net.UDPConn) error {
-	buf := make([]byte, 2048)
+	buf := make([]byte, 4096)
 
 	for {
 		select {
@@ -107,7 +138,7 @@ func (l *Listener) readLoop(ctx context.Context, conn *net.UDPConn) error {
 }
 
 func (l *Listener) handlePacket(remoteAddr *net.UDPAddr, data []byte) {
-	var msg MotorTelemetryMessage
+	var msg Message
 
 	if err := json.Unmarshal(data, &msg); err != nil {
 		l.logger.Warn(
@@ -119,7 +150,16 @@ func (l *Listener) handlePacket(remoteAddr *net.UDPAddr, data []byte) {
 		return
 	}
 
-	if msg.Type != "motor_status" {
+	if msg.Version != ProtocolVersion {
+		l.logger.Warn(
+			"unsupported telemetry protocol version",
+			"remote_addr", remoteAddr.String(),
+			"version", msg.Version,
+		)
+		return
+	}
+
+	if msg.Type != MessageTypeTelemetry {
 		l.logger.Warn(
 			"unknown telemetry message type",
 			"remote_addr", remoteAddr.String(),
@@ -128,22 +168,42 @@ func (l *Listener) handlePacket(remoteAddr *net.UDPAddr, data []byte) {
 		return
 	}
 
-	state := l.state.UpdateMotorTelemetry(control.MotorTelemetry{
-		BatteryVoltage: msg.BatteryVoltage,
-		RSSI:           msg.RSSI,
-		Left:           msg.Left,
-		Right:          msg.Right,
-		Failsafe:       msg.Failsafe,
-	})
+	telemetryData := control.MotorTelemetry{}
+
+	if msg.Payload.Motor != nil {
+		telemetryData.Left = msg.Payload.Motor.Left
+		telemetryData.Right = msg.Payload.Motor.Right
+		telemetryData.Failsafe = msg.Payload.Motor.Failsafe
+	}
+
+	if msg.Payload.Power != nil {
+		telemetryData.BatteryVoltage = msg.Payload.Power.BatteryVoltage
+		telemetryData.BatteryPercent = msg.Payload.Power.BatteryPercent
+	}
+
+	if msg.Payload.Network != nil {
+		telemetryData.RSSI = msg.Payload.Network.RSSI
+	}
+
+	if msg.Payload.System != nil {
+		telemetryData.UptimeMS = msg.Payload.System.UptimeMS
+		telemetryData.FreeHeap = msg.Payload.System.FreeHeap
+	}
+
+	state := l.state.UpdateMotorTelemetry(telemetryData)
 
 	l.logger.Info(
 		"motor telemetry received",
 		"remote_addr", remoteAddr.String(),
+		"seq", msg.Seq,
 		"battery_voltage", state.BatteryVoltage,
+		"battery_percent", state.BatteryPercent,
 		"rssi", state.RSSI,
 		"left", state.Left,
 		"right", state.Right,
 		"failsafe", state.Failsafe,
+		"uptime_ms", state.UptimeMS,
+		"free_heap", state.FreeHeap,
 	)
 }
 

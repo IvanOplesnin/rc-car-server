@@ -116,10 +116,13 @@ func (s *Service) UpdateMotorTelemetry(t MotorTelemetry) State {
 
 	s.state.MotorConnected = true
 	s.state.BatteryVoltage = t.BatteryVoltage
+	s.state.BatteryPercent = t.BatteryPercent
 	s.state.RSSI = t.RSSI
 	s.state.Left = t.Left
 	s.state.Right = t.Right
 	s.state.Failsafe = t.Failsafe
+	s.state.UptimeMS = t.UptimeMS
+	s.state.FreeHeap = t.FreeHeap
 	s.state.LastTelemetryAt = time.Now()
 
 	return s.state

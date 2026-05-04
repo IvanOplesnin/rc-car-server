@@ -3,14 +3,18 @@ package ws
 import (
 	"log/slog"
 	"net/http"
+	"sync/atomic"
+	"time"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/IvanOplesnin/rc-car-server.git/internal/control"
-	"github.com/gorilla/websocket"
 )
 
 type Handler struct {
 	logger  *slog.Logger
 	control *control.Service
+	seq     atomic.Uint64
 }
 
 func NewHandler(logger *slog.Logger, controlService *control.Service) *Handler {
@@ -25,7 +29,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 
 	// Для разработки разрешаем подключение с любого Origin.
-	// Когда будет VPN и постоянный адрес Raspberry Pi, это можно ограничить.
+	// Когда появится постоянный адрес Raspberry Pi внутри VPN, это можно ограничить.
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
@@ -68,44 +72,99 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleMessage(msg IncomingMessage) control.State {
 	h.logger.Info(
 		"received websocket message",
+		"version", msg.Version,
 		"type", msg.Type,
-		"left", msg.Left,
-		"right", msg.Right,
+		"seq", msg.Seq,
 	)
 
-	switch msg.Type {
-	case "drive":
-		return h.control.Drive(control.DriveCommand{
-			Left:  msg.Left,
-			Right: msg.Right,
-		})
+	if msg.Version != ProtocolVersion {
+		return h.invalidState(ErrUnsupportedProtocolVersion)
+	}
 
-	case "stop":
-		return h.control.Stop()
+	switch msg.Type {
+	case MessageTypeControl:
+		return h.handleControlMessage(msg)
+
+	case MessageTypeSystem:
+		return h.handleSystemMessage(msg)
 
 	default:
-		state := h.control.State()
-		state.LastCommandValid = false
-		state.LastError = ErrUnknownMessageType.Error()
-
-		h.logger.Warn("unknown websocket message type", "type", msg.Type)
-
-		return state
+		return h.invalidState(ErrUnknownMessageType)
 	}
 }
 
+func (h *Handler) handleControlMessage(msg IncomingMessage) control.State {
+	if msg.Payload.Drive == nil {
+		return h.invalidState(ErrMissingDrivePayload)
+	}
+
+	return h.control.Drive(control.DriveCommand{
+		Left:  msg.Payload.Drive.Left,
+		Right: msg.Payload.Drive.Right,
+	})
+}
+
+func (h *Handler) handleSystemMessage(msg IncomingMessage) control.State {
+	if msg.Payload.System == nil {
+		return h.invalidState(ErrMissingSystemPayload)
+	}
+
+	switch msg.Payload.System.Command {
+	case SystemCommandStop:
+		return h.control.Stop()
+
+	case SystemCommandEmergencyStop:
+		// На этом этапе emergency_stop делает обычный stop.
+		// Позже можно добавить отдельный метод control.EmergencyStop(reason).
+		return h.control.Stop()
+
+	default:
+		return h.invalidState(ErrUnknownSystemCommand)
+	}
+}
+
+func (h *Handler) invalidState(err error) control.State {
+	state := h.control.State()
+	state.LastCommandValid = false
+	state.LastError = err.Error()
+
+	h.logger.Warn("invalid websocket message", "error", err)
+
+	return state
+}
+
 func (h *Handler) sendState(conn *websocket.Conn, state control.State) {
-	msg := StateMessage{
-		Type:             "state",
-		MotorConnected:   state.MotorConnected,
-		CameraConnected:  state.CameraConnected,
-		Left:             state.Left,
-		Right:            state.Right,
-		Failsafe:         state.Failsafe,
-		LastCommandValid: state.LastCommandValid,
-		Error:            state.LastError,
-		BatteryVoltage:   state.BatteryVoltage,
-		RSSI:             state.RSSI,
+	msg := OutgoingMessage{
+		Version:   ProtocolVersion,
+		Type:      MessageTypeState,
+		Seq:       h.seq.Add(1),
+		Timestamp: time.Now().UnixMilli(),
+		Payload: OutgoingPayload{
+			Connection: ConnectionPayload{
+				MotorConnected:  state.MotorConnected,
+				CameraConnected: state.CameraConnected,
+			},
+			Drive: DrivePayload{
+				Left:  state.Left,
+				Right: state.Right,
+			},
+			Power: PowerPayload{
+				BatteryVoltage: state.BatteryVoltage,
+				BatteryPercent: state.BatteryPercent,
+			},
+			Network: NetworkPayload{
+				RSSI: state.RSSI,
+			},
+			System: StateSystemPayload{
+				UptimeMS: state.UptimeMS,
+				FreeHeap: state.FreeHeap,
+			},
+			Safety: SafetyPayload{
+				Failsafe:         state.Failsafe,
+				LastCommandValid: state.LastCommandValid,
+				LastError:        state.LastError,
+			},
+		},
 	}
 
 	if err := conn.WriteJSON(msg); err != nil {

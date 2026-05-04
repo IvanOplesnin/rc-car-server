@@ -12,17 +12,20 @@ type healthResponse struct {
 }
 
 type stateResponse struct {
-	MotorConnected   bool    `json:"motor_connected"`
-	CameraConnected  bool    `json:"camera_connected"`
-	Left             int     `json:"left"`
-	Right            int     `json:"right"`
-	Failsafe         bool    `json:"failsafe"`
-	LastCommandValid bool    `json:"last_command_valid"`
-	LastError        string  `json:"last_error"`
-	LastCommandAt    string  `json:"last_command_at,omitempty"`
+	MotorConnected   bool   `json:"motor_connected"`
+	CameraConnected  bool   `json:"camera_connected"`
+	Left             int    `json:"left"`
+	Right            int    `json:"right"`
+	Failsafe         bool   `json:"failsafe"`
+	LastCommandValid bool   `json:"last_command_valid"`
+	LastError        string `json:"last_error"`
+	LastCommandAt    string `json:"last_command_at,omitempty"`
 
-	BatteryVoltage float64 `json:"battery_voltage"`
-	RSSI           int     `json:"rssi"`
+	BatteryVoltage  float64 `json:"battery_voltage"`
+	BatteryPercent  int     `json:"battery_percent"`
+	RSSI            int     `json:"rssi"`
+	UptimeMS        uint64  `json:"uptime_ms"`
+	FreeHeap        uint64  `json:"free_heap"`
 	LastTelemetryAt string  `json:"last_telemetry_at,omitempty"`
 }
 
@@ -47,7 +50,10 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		LastCommandValid: state.LastCommandValid,
 		LastError:        state.LastError,
 		BatteryVoltage:   state.BatteryVoltage,
+		BatteryPercent:   state.BatteryPercent,
 		RSSI:             state.RSSI,
+		UptimeMS:         state.UptimeMS,
+		FreeHeap:         state.FreeHeap,
 	}
 
 	if !state.LastCommandAt.IsZero() {
