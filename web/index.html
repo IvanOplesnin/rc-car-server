@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <title>Tracked Car Control</title>
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+    <main class="page">
+        <section class="card">
+            <h1>Tracked Car Control</h1>
+            <p>Веб-интерфейс управления гусеничной машинкой</p>
+        
+            <div class="video-panel">
+                <img id="camera-stream" src="/video/stream" alt="Camera stream" />
+            </div>
+        
+            <div class="status">
+                <span id="ws-dot" class="status-dot offline"></span>
+                <span id="ws-status">WebSocket: отключен</span>
+            </div>
+        
+            <div class="state">
+                <div>Левая гусеница: <strong id="left-value">0</strong></div>
+                <div>Правая гусеница: <strong id="right-value">0</strong></div>
+                <div>ESP32 моторов: <strong id="motor-status">неизвестно</strong></div>
+                <div>Камера: <strong id="camera-status">неизвестно</strong></div>
+                <div>Failsafe: <strong id="failsafe-status">false</strong></div>
+                <div>Последняя команда: <strong id="command-status">-</strong></div>
+            </div>
+        
+            <div class="control-grid">
+                <button id="forward">Вперед</button>
+                <button id="left">Влево</button>
+                <button id="stop" class="stop">Стоп</button>
+                <button id="right">Вправо</button>
+                <button id="backward">Назад</button>
+            </div>
+        
+            <p class="hint">
+                Управление идет через WebSocket, команды на ESP32 отправляются через UDP,
+                видео приходит через MJPEG-поток.
+            </p>
+        </section>
+    </main>
+
+    <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+web:
+  static_dir: "web"
+
+motor:
+  address: "127.0.0.1:4210"
+
+camera:
+  stream_url: "http://192.168.1.60/stream"
+
+safety:
+  command_timeout_ms: 500

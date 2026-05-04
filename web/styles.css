@@ -1,0 +1,146 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #111827;
+    color: #f9fafb;
+}
+
+.page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.card {
+    width: 100%;
+    max-width: 720px;
+    padding: 32px;
+    border-radius: 24px;
+    background: #1f2937;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+h1 {
+    margin: 0 0 12px;
+    font-size: 32px;
+}
+
+p {
+    color: #d1d5db;
+    line-height: 1.5;
+}
+
+.video-panel {
+    width: 100%;
+    margin: 24px 0;
+    overflow: hidden;
+    border-radius: 18px;
+    background: #111827;
+    border: 1px solid #374151;
+    aspect-ratio: 4 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-panel img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 24px 0;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #111827;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+}
+
+.status-dot.online {
+    background: #22c55e;
+}
+
+.status-dot.offline {
+    background: #ef4444;
+}
+
+.state {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border-radius: 14px;
+    background: #111827;
+    color: #d1d5db;
+}
+
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 24px;
+}
+
+button {
+    padding: 14px 16px;
+    border: 0;
+    border-radius: 14px;
+    font-size: 16px;
+    cursor: pointer;
+    color: #f9fafb;
+    background: #374151;
+}
+
+button:hover {
+    background: #4b5563;
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+button.stop {
+    background: #991b1b;
+    color: #fee2e2;
+}
+
+#forward {
+    grid-column: 2;
+}
+
+#left {
+    grid-column: 1;
+}
+
+#stop {
+    grid-column: 2;
+}
+
+#right {
+    grid-column: 3;
+}
+
+#backward {
+    grid-column: 2;
+}
+
+.hint {
+    margin-top: 24px;
+    font-size: 14px;
+    color: #9ca3af;
+}
