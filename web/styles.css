@@ -144,3 +144,195 @@ button.stop {
     font-size: 14px;
     color: #9ca3af;
 }
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+    overscroll-behavior: none;
+}
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #111827;
+    color: #f9fafb;
+
+    -webkit-user-select: none;
+    user-select: none;
+
+    -webkit-touch-callout: none;
+}
+
+.page {
+    min-height: 100vh;
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.card {
+    width: 100%;
+    max-width: 720px;
+    background: #1f2937;
+    border-radius: 20px;
+    padding: 16px;
+}
+
+.card h1 {
+    margin: 0 0 8px;
+    font-size: 24px;
+}
+
+.card p {
+    margin: 0 0 12px;
+    color: #d1d5db;
+}
+
+.video-panel {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #020617;
+    border-radius: 16px;
+    overflow: hidden;
+    margin: 12px 0;
+}
+
+.video-panel img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
+    font-size: 14px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.status-dot.online {
+    background: #22c55e;
+}
+
+.status-dot.offline {
+    background: #ef4444;
+}
+
+.state {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    font-size: 14px;
+    background: #111827;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.control-pad {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(80px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.control-button {
+    min-height: 72px;
+    border: none;
+    border-radius: 18px;
+    background: #374151;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 700;
+
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+
+    cursor: pointer;
+}
+
+.control-button:active,
+.control-button.active {
+    background: #4f46e5;
+    transform: scale(0.98);
+}
+
+.control-button.stop {
+    background: #dc2626;
+}
+
+.control-button.stop:active,
+.control-button.stop.active {
+    background: #b91c1c;
+}
+
+.hint {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+@media (max-width: 600px) {
+    .page {
+        padding: 8px;
+    }
+
+    .card {
+        min-height: calc(100vh - 16px);
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    .card h1 {
+        font-size: 20px;
+    }
+
+    .state {
+        grid-template-columns: 1fr;
+        font-size: 13px;
+        max-height: 180px;
+        overflow: auto;
+    }
+
+    .control-button {
+        min-height: 76px;
+        font-size: 17px;
+    }
+
+    .hint {
+        display: none;
+    }
+}
+
+.control-button,
+.control-pad,
+button {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+}
+
+body {
+    overscroll-behavior: none;
+}

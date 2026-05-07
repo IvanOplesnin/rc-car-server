@@ -6,6 +6,9 @@ let wsSeq = 0;
 const COMMAND_REPEAT_MS = 100;
 const PROTOCOL_VERSION = 1;
 
+const SPEED_FORWARD = 70;
+const SPEED_TURN = 50;
+
 const wsDot = document.getElementById("ws-dot");
 const wsStatus = document.getElementById("ws-status");
 const leftValue = document.getElementById("left-value");
@@ -25,16 +28,12 @@ function nextSeq() {
     return wsSeq;
 }
 
-function nowUnixMilli() {
-    return Date.now();
-}
-
 function makeMessage(type, payload) {
     return {
         version: PROTOCOL_VERSION,
         type,
         seq: nextSeq(),
-        timestamp: nowUnixMilli(),
+        timestamp: Date.now(),
         payload,
     };
 }
@@ -58,7 +57,7 @@ function connectWebSocket() {
         wsStatus.textContent = "WebSocket: отключен";
         commandStatus.textContent = "соединение потеряно";
 
-        clearRepeatTimer();
+        stopDrive("ws_close", false);
 
         setTimeout(connectWebSocket, 1000);
     };
@@ -68,7 +67,14 @@ function connectWebSocket() {
     };
 
     socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
+        let msg;
+
+        try {
+            msg = JSON.parse(event.data);
+        } catch {
+            commandStatus.textContent = "ошибка разбора сообщения";
+            return;
+        }
 
         if (msg.version !== PROTOCOL_VERSION) {
             commandStatus.textContent = "неподдерживаемая версия протокола";
@@ -134,7 +140,7 @@ async function refreshState() {
 
         const state = await response.json();
         renderState(state);
-    } catch (error) {
+    } catch {
         commandStatus.textContent = "backend недоступен";
     }
 }
@@ -142,43 +148,51 @@ async function refreshState() {
 function sendMessage(message) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
         commandStatus.textContent = "WebSocket не подключен";
-        return;
+        return false;
     }
 
     socket.send(JSON.stringify(message));
+    return true;
 }
 
 function sendDrive(left, right) {
-    const message = makeMessage("control", {
-        drive: {
-            left,
-            right,
-        },
-    });
-
-    sendMessage(message);
+    return sendMessage(
+        makeMessage("control", {
+            drive: {
+                left,
+                right,
+            },
+        })
+    );
 }
 
-function sendStop(reason = "user") {
-    const message = makeMessage("system", {
-        system: {
-            command: "stop",
-            reason,
-        },
-    });
-
-    sendMessage(message);
+function sendStop(reason = "button_up") {
+    return sendMessage(
+        makeMessage("system", {
+            system: {
+                command: "stop",
+                reason,
+            },
+        })
+    );
 }
 
 function sendEmergencyStop(reason = "user") {
-    const message = makeMessage("system", {
-        system: {
-            command: "emergency_stop",
-            reason,
-        },
-    });
+    return sendMessage(
+        makeMessage("system", {
+            system: {
+                command: "emergency_stop",
+                reason,
+            },
+        })
+    );
+}
 
-    sendMessage(message);
+function clearRepeatTimer() {
+    if (repeatTimer !== null) {
+        clearInterval(repeatTimer);
+        repeatTimer = null;
+    }
 }
 
 function startDrive(left, right) {
@@ -197,52 +211,85 @@ function startDrive(left, right) {
     }, COMMAND_REPEAT_MS);
 }
 
-function stopDrive(reason = "button_up") {
+function stopDrive(reason = "button_up", sendStopCommand = true) {
     activeCommand = null;
     clearRepeatTimer();
-    sendStop(reason);
-}
 
-function clearRepeatTimer() {
-    if (repeatTimer !== null) {
-        clearInterval(repeatTimer);
-        repeatTimer = null;
+    document
+        .querySelectorAll(".control-button.active")
+        .forEach((button) => button.classList.remove("active"));
+
+    if (sendStopCommand) {
+        sendStop(reason);
     }
 }
 
 function bindHoldButton(id, left, right) {
     const button = document.getElementById(id);
 
-    button.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        startDrive(left, right);
-    });
+    if (!button) {
+        return;
+    }
 
-    button.addEventListener("pointerup", (event) => {
-        event.preventDefault();
-        stopDrive("button_up");
-    });
+    let isPressed = false;
 
-    button.addEventListener("pointercancel", (event) => {
+    const start = (event) => {
         event.preventDefault();
-        stopDrive("pointer_cancel");
-    });
 
-    button.addEventListener("pointerleave", (event) => {
-        if (event.buttons !== 0) {
-            stopDrive("pointer_leave");
+        if (isPressed) {
+            return;
         }
+
+        isPressed = true;
+        button.classList.add("active");
+
+        button.setPointerCapture?.(event.pointerId);
+
+        startDrive(left, right);
+    };
+
+    const stop = (event, reason) => {
+        event?.preventDefault();
+
+        if (!isPressed) {
+            return;
+        }
+
+        isPressed = false;
+        button.classList.remove("active");
+
+        stopDrive(reason);
+    };
+
+    button.addEventListener("pointerdown", start);
+    button.addEventListener("pointerup", (event) => stop(event, "button_up"));
+    button.addEventListener("pointercancel", (event) => stop(event, "pointer_cancel"));
+    button.addEventListener("pointerleave", (event) => stop(event, "pointer_leave"));
+
+    button.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
     });
 }
 
-bindHoldButton("forward", 70, 70);
-bindHoldButton("backward", -70, -70);
-bindHoldButton("left", -50, 50);
-bindHoldButton("right", 50, -50);
+bindHoldButton("forward", SPEED_FORWARD, SPEED_FORWARD);
+bindHoldButton("backward", -SPEED_FORWARD, -SPEED_FORWARD);
+bindHoldButton("left", -SPEED_TURN, SPEED_TURN);
+bindHoldButton("right", SPEED_TURN, -SPEED_TURN);
 
-document.getElementById("stop").addEventListener("click", () => {
-    sendEmergencyStop("stop_button");
-});
+const stopButton = document.getElementById("stop");
+
+if (stopButton) {
+    stopButton.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+
+        stopDrive("stop_button");
+        sendEmergencyStop("stop_button");
+    });
+
+    stopButton.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+    });
+}
 
 document.addEventListener("keydown", (event) => {
     if (event.repeat) {
@@ -252,25 +299,27 @@ document.addEventListener("keydown", (event) => {
     switch (event.key.toLowerCase()) {
         case "w":
         case "ц":
-            startDrive(70, 70);
+            startDrive(SPEED_FORWARD, SPEED_FORWARD);
             break;
 
         case "s":
         case "ы":
-            startDrive(-70, -70);
+            startDrive(-SPEED_FORWARD, -SPEED_FORWARD);
             break;
 
         case "a":
         case "ф":
-            startDrive(-50, 50);
+            startDrive(-SPEED_TURN, SPEED_TURN);
             break;
 
         case "d":
         case "в":
-            startDrive(50, -50);
+            startDrive(SPEED_TURN, -SPEED_TURN);
             break;
 
         case " ":
+            event.preventDefault();
+            stopDrive("space_key");
             sendEmergencyStop("space_key");
             break;
     }
@@ -295,7 +344,12 @@ window.addEventListener("blur", () => {
     stopDrive("window_blur");
 });
 
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        stopDrive("window_blur");
+    }
+});
+
 connectWebSocket();
 refreshState();
-
 setInterval(refreshState, 1000);

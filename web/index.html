@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>Tracked Car Control</title>
     <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -34,12 +35,18 @@
                 <div>Последняя команда: <strong id="command-status">-</strong></div>
             </div>
         
-            <div class="control-grid">
-                <button id="forward">Вперед</button>
-                <button id="left">Влево</button>
-                <button id="stop" class="stop">Стоп</button>
-                <button id="right">Вправо</button>
-                <button id="backward">Назад</button>
+            <div class="control-pad" aria-label="Управление машинкой">
+                <div></div>
+                <button id="forward" class="control-button">Вперед</button>
+                <div></div>
+            
+                <button id="left" class="control-button">Влево</button>
+                <button id="stop" class="control-button stop">Стоп</button>
+                <button id="right" class="control-button">Вправо</button>
+            
+                <div></div>
+                <button id="backward" class="control-button">Назад</button>
+                <div></div>
             </div>
         
             <p class="hint">
