@@ -26,6 +26,7 @@ type App struct {
 	controlService    *control.Service
 	motorClient       *motor.Client
 	cameraProxy       *camera.Proxy
+	cameraBroadcaster *camera.Broadcaster
 	cameraMonitor     *camera.Monitor
 	telemetryListener *telemetry.Listener
 	wsHandler         *ws.Handler
@@ -42,6 +43,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	wsHandler := ws.NewHandler(logger, controlService)
 
 	cameraProxy := camera.NewProxy(cfg.Camera.StreamURL, logger)
+	cameraBroadcaster := camera.NewBroadcaster(cfg.Camera.StreamURL, logger, controlService)
 
 	cameraMonitor := camera.NewMonitor(
 		logger,
@@ -62,7 +64,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		cfg,
 		logger,
 		wsHandler,
-		cameraProxy,
+		cameraBroadcaster,
 		controlService,
 	)
 
@@ -76,6 +78,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		controlService:    controlService,
 		motorClient:       motorClient,
 		cameraProxy:       cameraProxy,
+		cameraBroadcaster: cameraBroadcaster,
 		cameraMonitor:     cameraMonitor,
 		telemetryListener: telemetryListener,
 		wsHandler:         wsHandler,
@@ -90,7 +93,7 @@ func (a *App) Run() error {
 	errCh := make(chan error, 2)
 
 	go a.watchdog.Run(ctx)
-	go a.cameraMonitor.Run(ctx)
+	go a.cameraBroadcaster.Run(ctx)
 
 	go func() {
 		if err := a.telemetryListener.Run(ctx); err != nil {
