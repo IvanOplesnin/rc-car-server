@@ -14,6 +14,7 @@ type Config struct {
 	Telemetry TelemetryConfig `yaml:"telemetry"`
 	Camera    CameraConfig    `yaml:"camera"`
 	Safety    SafetyConfig    `yaml:"safety"`
+	Access    AccessConfig    `yaml:"access"`
 }
 
 type ServerConfig struct {
@@ -42,6 +43,16 @@ type CameraConfig struct {
 
 type SafetyConfig struct {
 	CommandTimeoutMS int `yaml:"command_timeout_ms"`
+}
+
+type AccessConfig struct {
+	ControlTimeoutMS int              `yaml:"control_timeout_ms"`
+	Operators        []OperatorConfig `yaml:"operators"`
+}
+
+type OperatorConfig struct {
+	Name string   `yaml:"name"`
+	IPs  []string `yaml:"ips"`
 }
 
 func Load(path string) (*Config, error) {
@@ -102,6 +113,10 @@ func (c *Config) Validate() error {
 
 	if c.Safety.CommandTimeoutMS <= 0 {
 		return fmt.Errorf("safety.command_timeout_ms must be positive")
+	}
+	
+	if c.Access.ControlTimeoutMS <= 0 {
+		c.Access.ControlTimeoutMS = 30000
 	}
 
 	return nil

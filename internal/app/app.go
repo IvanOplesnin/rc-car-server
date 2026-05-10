@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/IvanOplesnin/rc-car-server.git/internal/access"
 	"github.com/IvanOplesnin/rc-car-server.git/internal/camera"
 	"github.com/IvanOplesnin/rc-car-server.git/internal/config"
 	"github.com/IvanOplesnin/rc-car-server.git/internal/control"
@@ -31,6 +32,7 @@ type App struct {
 	telemetryListener *telemetry.Listener
 	wsHandler         *ws.Handler
 	watchdog          *safety.Watchdog
+	accessManager     *access.Manager
 }
 
 func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
@@ -40,7 +42,23 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	controlService := control.NewService(logger, motorClient)
-	wsHandler := ws.NewHandler(logger, controlService)
+
+	operators := make([]access.Operator, 0, len(cfg.Access.Operators))
+
+	for _, operator := range cfg.Access.Operators {
+		operators = append(operators, access.Operator{
+			Name: operator.Name,
+			IPs:  operator.IPs,
+		})
+	}
+
+	accessManager := access.NewManager(
+		logger,
+		operators,
+		time.Duration(cfg.Access.ControlTimeoutMS)*time.Millisecond,
+	)
+
+	wsHandler := ws.NewHandler(logger, controlService, accessManager)
 
 	cameraProxy := camera.NewProxy(cfg.Camera.StreamURL, logger)
 	cameraBroadcaster := camera.NewBroadcaster(cfg.Camera.StreamURL, logger, controlService)
@@ -83,6 +101,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		telemetryListener: telemetryListener,
 		wsHandler:         wsHandler,
 		watchdog:          watchdog,
+		accessManager:     accessManager,
 	}, nil
 }
 

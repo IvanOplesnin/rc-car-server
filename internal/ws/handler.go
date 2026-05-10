@@ -8,19 +8,26 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/IvanOplesnin/rc-car-server.git/internal/access"
 	"github.com/IvanOplesnin/rc-car-server.git/internal/control"
 )
 
 type Handler struct {
-	logger  *slog.Logger
-	control *control.Service
-	seq     atomic.Uint64
+	logger        *slog.Logger
+	control       *control.Service
+	accessManager *access.Manager
+	seq           atomic.Uint64
 }
 
-func NewHandler(logger *slog.Logger, controlService *control.Service) *Handler {
+func NewHandler(
+	logger *slog.Logger,
+	controlService *control.Service,
+	accessManager *access.Manager,
+) *Handler {
 	return &Handler{
-		logger:  logger,
-		control: controlService,
+		logger:        logger,
+		control:       controlService,
+		accessManager: accessManager,
 	}
 }
 
@@ -51,25 +58,43 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var msg IncomingMessage
 
 		if err := conn.ReadJSON(&msg); err != nil {
-			h.logger.Info("websocket client disconnected", "error", err)
-
-			state := h.control.Stop()
 			h.logger.Info(
-				"motors stopped after websocket disconnect",
-				"left", state.Left,
-				"right", state.Right,
+				"websocket client disconnected",
+				"remote_addr", r.RemoteAddr,
+				"error", err,
 			)
-
+		
+			decision := h.accessManager.IsOwner(r.RemoteAddr)
+			if decision.Allowed {
+				state := h.control.Stop()
+		
+				h.logger.Info(
+					"motors stopped after owner websocket disconnect",
+					"remote_addr", r.RemoteAddr,
+					"client", decision.Client,
+					"left", state.Left,
+					"right", state.Right,
+				)
+			} else {
+				h.logger.Info(
+					"websocket disconnected without motor stop",
+					"remote_addr", r.RemoteAddr,
+					"reason", decision.Reason,
+					"client", decision.Client,
+					"owner", decision.Owner,
+				)
+			}
+		
 			return
 		}
 
-		state := h.handleMessage(msg)
+		state := h.handleMessage(r.RemoteAddr, msg)
 
 		h.sendState(conn, state)
 	}
 }
 
-func (h *Handler) handleMessage(msg IncomingMessage) control.State {
+func (h *Handler) handleMessage(remoteAddr string, msg IncomingMessage) control.State {
 	h.logger.Info(
 		"received websocket message",
 		"version", msg.Version,
@@ -83,20 +108,44 @@ func (h *Handler) handleMessage(msg IncomingMessage) control.State {
 
 	switch msg.Type {
 	case MessageTypeControl:
-		return h.handleControlMessage(msg)
-
+		return h.handleControlMessage(remoteAddr, msg)
+	
 	case MessageTypeSystem:
-		return h.handleSystemMessage(msg)
-
+		return h.handleSystemMessage(remoteAddr, msg)
+	
 	default:
 		return h.invalidState(ErrUnknownMessageType)
 	}
 }
 
-func (h *Handler) handleControlMessage(msg IncomingMessage) control.State {
+func (h *Handler) handleControlMessage(remoteAddr string, msg IncomingMessage) control.State {
 	if msg.Payload.Drive == nil {
 		return h.invalidState(ErrMissingDrivePayload)
 	}
+
+	decision := h.accessManager.CanControl(remoteAddr)
+	if !decision.Allowed {
+		h.logger.Warn(
+			"drive command rejected",
+			"reason", decision.Reason,
+			"remote_addr", remoteAddr,
+			"client", decision.Client,
+			"owner", decision.Owner,
+		)
+
+		state := h.control.State()
+		state.LastCommandValid = false
+		state.LastError = "control access denied: " + decision.Reason
+
+		return state
+	}
+
+	h.logger.Info(
+		"drive command accepted by access manager",
+		"remote_addr", remoteAddr,
+		"client", decision.Client,
+		"owner", decision.Owner,
+	)
 
 	return h.control.Drive(control.DriveCommand{
 		Left:  msg.Payload.Drive.Left,
@@ -104,18 +153,64 @@ func (h *Handler) handleControlMessage(msg IncomingMessage) control.State {
 	})
 }
 
-func (h *Handler) handleSystemMessage(msg IncomingMessage) control.State {
+func (h *Handler) handleSystemMessage(remoteAddr string, msg IncomingMessage) control.State {
 	if msg.Payload.System == nil {
 		return h.invalidState(ErrMissingSystemPayload)
 	}
 
 	switch msg.Payload.System.Command {
 	case SystemCommandStop:
+		decision := h.accessManager.CanControl(remoteAddr)
+		if !decision.Allowed {
+			h.logger.Warn(
+				"stop command rejected",
+				"reason", decision.Reason,
+				"remote_addr", remoteAddr,
+				"client", decision.Client,
+				"owner", decision.Owner,
+			)
+
+			state := h.control.State()
+			state.LastCommandValid = false
+			state.LastError = "control access denied: " + decision.Reason
+
+			return state
+		}
+
+		h.logger.Info(
+			"stop command accepted by access manager",
+			"remote_addr", remoteAddr,
+			"client", decision.Client,
+			"owner", decision.Owner,
+		)
+
 		return h.control.Stop()
 
 	case SystemCommandEmergencyStop:
-		// На этом этапе emergency_stop делает обычный stop.
-		// Позже можно добавить отдельный метод control.EmergencyStop(reason).
+		decision := h.accessManager.AllowEmergencyStop(remoteAddr)
+		if !decision.Allowed {
+			h.logger.Warn(
+				"emergency stop command rejected",
+				"reason", decision.Reason,
+				"remote_addr", remoteAddr,
+				"client", decision.Client,
+				"owner", decision.Owner,
+			)
+
+			state := h.control.State()
+			state.LastCommandValid = false
+			state.LastError = "emergency stop access denied: " + decision.Reason
+
+			return state
+		}
+
+		h.logger.Warn(
+			"emergency stop command accepted",
+			"remote_addr", remoteAddr,
+			"client", decision.Client,
+			"owner", decision.Owner,
+		)
+
 		return h.control.Stop()
 
 	default:

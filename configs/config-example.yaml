@@ -13,3 +13,21 @@ camera:
 
 safety:
   command_timeout_ms: 500
+
+
+access:
+  control_timeout_ms: 30000
+  operators:
+    - name: "Ivan local"
+      ips:
+        - "127.0.0.1"
+        - "::1"
+        - "192.168.1.6"
+
+    - name: "Ivan VPN phone"
+      ips:
+        - "10.10.0.2"
+
+    - name: "Ivan VPN PC"
+      ips:
+        - "10.10.0.3"
