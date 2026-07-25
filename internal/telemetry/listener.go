@@ -192,7 +192,7 @@ func (l *Listener) handlePacket(remoteAddr *net.UDPAddr, data []byte) {
 
 	state := l.state.UpdateMotorTelemetry(telemetryData)
 
-	l.logger.Info(
+	l.logger.Debug(
 		"motor telemetry received",
 		"remote_addr", remoteAddr.String(),
 		"seq", msg.Seq,
