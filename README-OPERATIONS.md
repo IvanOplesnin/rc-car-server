@@ -35,7 +35,7 @@ curl -fsS http://192.168.1.28:18081/api/state
 
 ```bash
 ssh raps
-cd /home/ivan/rc-car-server
+cd /home/ivan/rc-car-telemetry-relay
 docker compose -f compose.telemetry-relay.yaml up -d --build
 docker compose -f compose.telemetry-relay.yaml ps
 docker compose -f compose.telemetry-relay.yaml logs --tail=100
