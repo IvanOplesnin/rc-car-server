@@ -1,0 +1,28 @@
+services:
+  rc-car-server:
+    image: local/rc-car-server:2026.07.25
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rc-car-server
+    restart: always
+    environment:
+      TZ: Europe/Moscow
+    ports:
+      - "192.168.1.28:18081:8081/tcp"
+      - "192.168.1.28:4211:4211/udp"
+    volumes:
+      - ./configs/config.yaml:/app/configs/config.yaml:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 10s

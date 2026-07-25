@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -18,8 +19,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host           string   `yaml:"host"`
+	Port           int      `yaml:"port"`
+	TrustedProxies []string `yaml:"trusted_proxies"`
 }
 
 type WebConfig struct {
@@ -83,6 +85,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("server.port must be between 1 and 65535")
 	}
 
+	for _, value := range c.Server.TrustedProxies {
+		if _, err := parseIPOrPrefix(value); err != nil {
+			return fmt.Errorf("server.trusted_proxies: %w", err)
+		}
+	}
+
 	if c.Web.StaticDir == "" {
 		return fmt.Errorf("web.static_dir is required")
 	}
@@ -114,12 +122,25 @@ func (c *Config) Validate() error {
 	if c.Safety.CommandTimeoutMS <= 0 {
 		return fmt.Errorf("safety.command_timeout_ms must be positive")
 	}
-	
+
 	if c.Access.ControlTimeoutMS <= 0 {
 		c.Access.ControlTimeoutMS = 30000
 	}
 
 	return nil
+}
+
+func parseIPOrPrefix(value string) (netip.Prefix, error) {
+	if prefix, err := netip.ParsePrefix(value); err == nil {
+		return prefix.Masked(), nil
+	}
+
+	addr, err := netip.ParseAddr(value)
+	if err != nil {
+		return netip.Prefix{}, fmt.Errorf("invalid IP address or prefix %q", value)
+	}
+
+	return netip.PrefixFrom(addr, addr.BitLen()), nil
 }
 
 func (c *Config) HTTPAddress() string {

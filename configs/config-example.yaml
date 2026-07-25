@@ -1,20 +1,27 @@
 server:
   host: "0.0.0.0"
-  port: 8080
+  port: 8081
+  # X-Forwarded-For принимается только от указанных reverse proxy.
+  trusted_proxies:
+    - "192.168.1.25"
 
 web:
   static_dir: "web"
 
 motor:
-  address: "127.0.0.1:4210"
+  address: "192.168.1.15:4210"
+
+telemetry:
+  listen_address: "0.0.0.0:4211"
+  motor_timeout_ms: 1500
 
 camera:
-  stream_url: "http://192.168.1.60/stream"
+  stream_url: "http://192.168.1.16/stream"
+  check_interval_ms: 3000
+  check_timeout_ms: 1000
 
 safety:
   command_timeout_ms: 500
-
-
 access:
   control_timeout_ms: 30000
   operators:

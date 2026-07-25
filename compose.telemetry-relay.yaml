@@ -1,0 +1,20 @@
+services:
+  telemetry-relay:
+    image: local/rc-car-server:2026.07.25
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rc-car-telemetry-relay
+    entrypoint: ["/app/telemetry-relay"]
+    restart: always
+    network_mode: host
+    environment:
+      TZ: Europe/Moscow
+      TELEMETRY_RELAY_LISTEN: "0.0.0.0:4211"
+      TELEMETRY_RELAY_TARGET: "192.168.1.28:4211"
+      TELEMETRY_RELAY_SOURCE_IP: "192.168.1.15"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

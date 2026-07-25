@@ -108,7 +108,9 @@ Browser -> Raspberry Pi 5:
 ```yaml
 server:
   host: "0.0.0.0"
-  port: 8080
+  port: 8081
+  trusted_proxies:
+    - "192.168.1.25"
 
 web:
   static_dir: "web"

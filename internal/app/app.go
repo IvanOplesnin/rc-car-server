@@ -58,7 +58,12 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		time.Duration(cfg.Access.ControlTimeoutMS)*time.Millisecond,
 	)
 
-	wsHandler := ws.NewHandler(logger, controlService, accessManager)
+	clientIPResolver, err := access.NewClientIPResolver(cfg.Server.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("create client IP resolver: %w", err)
+	}
+
+	wsHandler := ws.NewHandler(logger, controlService, accessManager, clientIPResolver)
 
 	cameraProxy := camera.NewProxy(cfg.Camera.StreamURL, logger)
 	cameraBroadcaster := camera.NewBroadcaster(cfg.Camera.StreamURL, logger, controlService)

@@ -3,6 +3,8 @@ package ws
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +18,7 @@ type Handler struct {
 	logger        *slog.Logger
 	control       *control.Service
 	accessManager *access.Manager
+	clientIPs     *access.ClientIPResolver
 	seq           atomic.Uint64
 }
 
@@ -23,26 +26,25 @@ func NewHandler(
 	logger *slog.Logger,
 	controlService *control.Service,
 	accessManager *access.Manager,
+	clientIPs *access.ClientIPResolver,
 ) *Handler {
 	return &Handler{
 		logger:        logger,
 		control:       controlService,
 		accessManager: accessManager,
+		clientIPs:     clientIPs,
 	}
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-
-	// Для разработки разрешаем подключение с любого Origin.
-	// Когда появится постоянный адрес Raspberry Pi внутри VPN, это можно ограничить.
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	remoteAddr := h.clientIPs.Resolve(r.RemoteAddr, r.Header.Get("X-Forwarded-For"))
+
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     sameOrigin,
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Error("upgrade websocket", "error", err)
@@ -50,7 +52,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	h.logger.Info("websocket client connected", "remote_addr", r.RemoteAddr)
+	h.logger.Info(
+		"websocket client connected",
+		"remote_addr", remoteAddr,
+		"proxy_addr", r.RemoteAddr,
+	)
 
 	h.sendState(conn, h.control.State())
 
@@ -60,17 +66,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := conn.ReadJSON(&msg); err != nil {
 			h.logger.Info(
 				"websocket client disconnected",
-				"remote_addr", r.RemoteAddr,
+				"remote_addr", remoteAddr,
 				"error", err,
 			)
-		
-			decision := h.accessManager.IsOwner(r.RemoteAddr)
+
+			decision := h.accessManager.IsOwner(remoteAddr)
 			if decision.Allowed {
 				state := h.control.Stop()
-		
+
 				h.logger.Info(
 					"motors stopped after owner websocket disconnect",
-					"remote_addr", r.RemoteAddr,
+					"remote_addr", remoteAddr,
 					"client", decision.Client,
 					"left", state.Left,
 					"right", state.Right,
@@ -78,20 +84,34 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			} else {
 				h.logger.Info(
 					"websocket disconnected without motor stop",
-					"remote_addr", r.RemoteAddr,
+					"remote_addr", remoteAddr,
 					"reason", decision.Reason,
 					"client", decision.Client,
 					"owner", decision.Owner,
 				)
 			}
-		
+
 			return
 		}
 
-		state := h.handleMessage(r.RemoteAddr, msg)
+		state := h.handleMessage(remoteAddr, msg)
 
 		h.sendState(conn, state)
 	}
+}
+
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	return strings.EqualFold(parsed.Host, r.Host)
 }
 
 func (h *Handler) handleMessage(remoteAddr string, msg IncomingMessage) control.State {
@@ -109,10 +129,10 @@ func (h *Handler) handleMessage(remoteAddr string, msg IncomingMessage) control.
 	switch msg.Type {
 	case MessageTypeControl:
 		return h.handleControlMessage(remoteAddr, msg)
-	
+
 	case MessageTypeSystem:
 		return h.handleSystemMessage(remoteAddr, msg)
-	
+
 	default:
 		return h.invalidState(ErrUnknownMessageType)
 	}
