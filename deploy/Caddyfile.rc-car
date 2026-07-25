@@ -1,4 +1,4 @@
-car.minipc.home {
+car.home.arpa {
   import local_only
 
   reverse_proxy 192.168.1.28:18081 {

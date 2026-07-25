@@ -7,7 +7,7 @@
 
 ## Адреса
 
-- Web: `https://car.minipc.home`
+- Web: `https://car.home.arpa`
 - mini-PC backend: `192.168.1.28:18081`
 - мотор: `192.168.1.15:4210/udp`
 - телеметрия mini-PC: `192.168.1.28:4211/udp`

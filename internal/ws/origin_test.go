@@ -12,10 +12,10 @@ func TestSameOrigin(t *testing.T) {
 		origin string
 		want   bool
 	}{
-		{name: "same https host", host: "car.minipc.home", origin: "https://car.minipc.home", want: true},
+		{name: "same https host", host: "car.home.arpa", origin: "https://car.home.arpa", want: true},
 		{name: "same host with port", host: "192.168.1.28:18081", origin: "http://192.168.1.28:18081", want: true},
-		{name: "missing origin", host: "car.minipc.home", origin: "", want: true},
-		{name: "foreign origin", host: "car.minipc.home", origin: "https://example.com", want: false},
+		{name: "missing origin", host: "car.home.arpa", origin: "", want: true},
+		{name: "foreign origin", host: "car.home.arpa", origin: "https://example.com", want: false},
 	}
 
 	for _, tt := range tests {
