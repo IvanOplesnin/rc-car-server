@@ -13,6 +13,9 @@
 - телеметрия mini-PC: `192.168.1.28:4211/udp`
 - камера: `http://192.168.1.16/stream`
 
+Версионируемые фрагменты конфигурации Caddy и AdGuard Home находятся в
+`deploy/Caddyfile.rc-car` и `deploy/adguard-rewrite.json`.
+
 ## Управление основным сервисом
 
 ```bash
